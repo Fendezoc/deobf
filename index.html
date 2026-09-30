@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lua Script Deobfuscator Web</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        textarea {
+            font-family: 'Fira Code', 'Courier New', Courier, monospace;
+            tab-size: 4;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-950 p-4">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-code text-2xl text-indigo-500"></i>
+                <h1 class="text-xl font-bold tracking-wide bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                    Lua Deobfuscator Online
+                </h1>
+            </div>
+            <span class="text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700">
+                GitHub Pages Edition
+            </span>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 flex flex-col gap-4">
+        
+        <!-- Config & Controls Bar -->
+        <div class="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-4">
+                <div class="flex items-center space-x-2">
+                    <label class="text-xs text-slate-400 font-medium">Loại Obfuscator:</label>
+                    <select id="obfType" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded px-2.5 py-1.5 focus:outline-none focus:border-indigo-500">
+                        <option value="auto">Auto Detect</option>
+                        <option value="ironbrew1">IronBrew v1</option>
+                        <option value="luraph15">Luraph v1.5</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <label class="text-xs text-slate-400 font-medium">Backend API URL:</label>
+                    <input type="text" id="apiUrl" placeholder="http://localhost:5000/api/deobfuscate" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded px-2.5 py-1.5 w-64 focus:outline-none focus:border-indigo-500" value="http://127.0.0.1:5000/api/deobfuscate">
+                </div>
+            </div>
+
+            <button id="btnDeobf" onclick="processDeobfuscate()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-5 py-1.5 rounded transition flex items-center space-x-2 shadow-lg shadow-indigo-600/20">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>Deobfuscate</span>
+            </button>
+        </div>
+
+        <!-- Code Workspace (Input & Output) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-[550px]">
+            
+            <!-- Input Editor -->
+            <div class="flex flex-col bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-900/80 px-4 py-2 border-b border-slate-800 flex justify-between items-center text-xs text-slate-400 font-mono">
+                    <span>MÃ NGUỒN OBFUSCATED (LUA)</span>
+                    <button onclick="clearInput()" class="hover:text-slate-200 transition"><i class="fa-solid fa-trash mr-1"></i>Xóa</button>
+                </div>
+                <textarea id="inputCode" placeholder="Dán mã Lua bị Obfuscate vào đây..." class="w-full flex-1 p-4 bg-transparent text-slate-200 resize-none focus:outline-none text-sm font-mono leading-relaxed"></textarea>
+            </div>
+
+            <!-- Output Editor -->
+            <div class="flex flex-col bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                <div class="bg-slate-900/80 px-4 py-2 border-b border-slate-800 flex justify-between items-center text-xs text-slate-400 font-mono">
+                    <span>KẾT QUẢ DEOBFUSCATED</span>
+                    <div class="flex space-x-3">
+                        <button onclick="copyOutput()" class="hover:text-slate-200 transition"><i class="fa-regular fa-copy mr-1"></i>Sao chép</button>
+                        <button onclick="downloadOutput()" class="hover:text-slate-200 transition"><i class="fa-solid fa-download mr-1"></i>Tải về</button>
+                    </div>
+                </div>
+                <div class="relative flex-1">
+                    <textarea id="outputCode" readonly placeholder="Kết quả sau khi deobfuscate sẽ hiển thị ở đây..." class="w-full h-full p-4 bg-transparent text-emerald-400 resize-none focus:outline-none text-sm font-mono leading-relaxed"></textarea>
+                    
+                    <!-- Loading Overlay -->
+                    <div id="loadingOverlay" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex-col items-center justify-center gap-3">
+                        <div class="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                        <span class="text-sm text-slate-300">Đang phân tích & deobfuscate...</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <script>
+        async function processDeobfuscate() {
+            const inputCode = document.getElementById('inputCode').value;
+            const obfType = document.getElementById('obfType').value;
+            const apiUrl = document.getElementById('apiUrl').value.trim();
+            const outputArea = document.getElementById('outputCode');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+
+            if (!inputCode.trim()) {
+                alert('Vui lòng nhập mã Lua cần giải mã!');
+                return;
+            }
+
+            loadingOverlay.classList.remove('hidden');
+            loadingOverlay.classList.add('flex');
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: inputCode, type: obfType })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    outputArea.value = data.result;
+                    outputArea.classList.remove('text-red-400');
+                    outputArea.classList.add('text-emerald-400');
+                } else {
+                    outputArea.value = `-- LỖI GIẢI MÃ --\n${data.error || 'Đã có lỗi xảy ra.'}\n\n-- CHI TIẾT --\n${data.traceback || ''}`;
+                    outputArea.classList.remove('text-emerald-400');
+                    outputArea.classList.add('text-red-400');
+                }
+            } catch (err) {
+                outputArea.value = `-- LỖI KẾT NỐI API SERVER --\nKhông thể kết nối đến: ${apiUrl}\n\nChi tiết lỗi: ${err.message}\n\nLưu ý: Bạn cần khởi chạy Python Backend (API) ở máy cá nhân hoặc host server Python riêng để xử lý deobfuscation.`;
+                outputArea.classList.remove('text-emerald-400');
+                outputArea.classList.add('text-red-400');
+            } finally {
+                loadingOverlay.classList.add('hidden');
+                loadingOverlay.classList.remove('flex');
+            }
+        }
+
+        function clearInput() {
+            document.getElementById('inputCode').value = '';
+        }
+
+        function copyOutput() {
+            const output = document.getElementById('outputCode').value;
+            if (output) {
+                navigator.clipboard.writeText(output);
+                alert('Đã sao chép kết quả!');
+            }
+        }
+
+        function downloadOutput() {
+            const output = document.getElementById('outputCode').value;
+            if (!output) return;
+            const blob = new Blob([output], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'deobfuscated.lua';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
